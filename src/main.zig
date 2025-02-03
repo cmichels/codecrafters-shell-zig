@@ -14,5 +14,7 @@ pub fn main() !void {
         const command = it.next().?;
 
         try stdout.print("{s}: command not found\n", .{command});
+        try stdout.print("exit 0");
+        break;
     }
 }
