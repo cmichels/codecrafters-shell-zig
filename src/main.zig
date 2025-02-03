@@ -12,13 +12,15 @@ pub fn main() !void {
 
         var commands = std.mem.splitScalar(u8, user_input, ' ');
         const command = commands.first();
+
         const args = commands.rest();
 
         if (std.mem.eql(u8, command, "exit")) {
             try handleExit(args);
-        }
-        if (std.mem.eql(u8, command, "echo")) {
+        } else if (std.mem.eql(u8, command, "echo")) {
             try handleEcho(args, stdout);
+        } else if (std.mem.eql(u8, command, "type")) {
+            try handleType(args, stdout);
         } else {
             try stdout.print("{s}: command not found\n", .{command});
         }
@@ -32,4 +34,14 @@ fn handleExit(args: []const u8) !void {
 
 fn handleEcho(args: []const u8, out: anytype) !void {
     try out.print("{s}\n", .{args});
+}
+fn handleType(cmd: []const u8, out: anytype) !void {
+    const CommandType = enum { exit, echo, type, unknown };
+    const command_type = std.meta.stringToEnum(CommandType, cmd) orelse CommandType.unknown;
+    try switch (command_type) {
+        .exit => out.print("{s} is a shell builtin\n", .{cmd}),
+        .echo => out.print("{s} is a shell builtin\n", .{cmd}),
+        .type => out.print("{s} is a shell builtin\n", .{cmd}),
+        else => out.print("{s}: not found\n", .{cmd}),
+    };
 }
