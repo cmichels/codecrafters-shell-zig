@@ -11,7 +11,7 @@ pub fn main() !void {
 
     // TODO: Handle user input
 
-    var it = std.mem.splitSequence(u8, user_input, " ");
+    var it = std.mem.splitScalar(u8, user_input, ' ');
     const command = it.next().?;
 
     try stdout.print("{s}: command not found\n", .{command});
