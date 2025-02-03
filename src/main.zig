@@ -10,16 +10,26 @@ pub fn main() !void {
         try stdout.print("$ ", .{});
         const user_input = try stdin.readUntilDelimiter(&buffer, '\n');
 
-        var it = std.mem.splitScalar(u8, user_input, ' ');
-        const command = it.next();
+        var commands = std.mem.splitScalar(u8, user_input, ' ');
+        const command = commands.first();
+        const args = commands.rest();
 
-        if (command) |c| {
-            if (std.mem.eql(u8, c, "exit")) {
-                const exit_code = try std.fmt.parseInt(u8, it.next() orelse "0", 10);
-                std.process.exit(exit_code);
-            } else {
-                try stdout.print("{s}: command not found\n", .{c});
-            }
+        if (std.mem.eql(u8, command, "exit")) {
+            try handleExit(args);
+        }
+        if (std.mem.eql(u8, command, "echo")) {
+            try handleEcho(args, stdout);
+        } else {
+            try stdout.print("{s}: command not found\n", .{command});
         }
     }
+}
+
+fn handleExit(args: []const u8) !void {
+    const exit_code = try std.fmt.parseInt(u8, args, 10);
+    std.process.exit(exit_code);
+}
+
+fn handleEcho(args: []const u8, out: anytype) !void {
+    try out.print("{s}\n", .{args});
 }
