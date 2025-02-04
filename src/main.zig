@@ -76,7 +76,7 @@ fn handleExecutable(cmd: []const u8, args: []const u8) !void {
     var argv = std.ArrayList([]const u8).init(allocator);
     defer argv.deinit();
 
-    try argv.append(file_path);
+    try argv.append(cmd);
     if (args.len > 0) {
         try argv.append(args);
     }
