@@ -79,5 +79,5 @@ fn handleExecutable(cmd: []const u8, out: anytype) !void {
         return;
     }
 
-    try out.print("{s}: not found", .{cmd});
+    try out.print("{s}: not found\n", .{cmd});
 }
