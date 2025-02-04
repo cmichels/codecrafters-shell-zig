@@ -18,9 +18,9 @@ pub fn main() !void {
         const command_type = getCommand(command);
 
         try switch (command_type) {
-            .exit => handleExit(args),
-            .echo => handleEcho(args, stdout),
-            .type => handleType(args, stdout),
+            .exit => builtinExit(args),
+            .echo => builtinEcho(args, stdout),
+            .type => builtinType(args, stdout),
             else => handleExecutable(command, args, stdout),
         };
     }
@@ -30,17 +30,17 @@ fn getCommand(cmd: []const u8) CommandType {
     return std.meta.stringToEnum(CommandType, cmd) orelse CommandType.unknown;
 }
 
-fn handleExit(args: []const u8) !void {
+fn builtinExit(args: []const u8) !void {
     const exit_code = std.fmt.parseInt(u8, args, 10) catch |err| switch (err) {
         else => 0,
     };
     std.process.exit(exit_code);
 }
 
-fn handleEcho(args: []const u8, out: anytype) !void {
+fn builtinEcho(args: []const u8, out: anytype) !void {
     try out.print("{s}\n", .{args});
 }
-fn handleType(cmd: []const u8, out: anytype) !void {
+fn builtinType(cmd: []const u8, out: anytype) !void {
     const command_type = getCommand(cmd);
     try switch (command_type) {
         .exit => out.print("{s} is a shell builtin\n", .{cmd}),
@@ -64,6 +64,7 @@ fn handleExecutableType(cmd: []const u8, out: anytype) !void {
 
     try out.print("{s} is {s}\n", .{ cmd, file_path });
 }
+
 fn handleExecutable(cmd: []const u8, args: []const u8, out: anytype) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -87,6 +88,7 @@ fn handleExecutable(cmd: []const u8, args: []const u8, out: anytype) !void {
     var child = std.process.Child.init(argv.items, allocator);
     _ = try child.spawnAndWait();
 }
+
 fn getExecutable(allocator: std.mem.Allocator, cmd: []const u8) ![]const u8 {
     const path_env = std.process.getEnvVarOwned(allocator, "PATH") catch |err| switch (err) {
         else => "",
