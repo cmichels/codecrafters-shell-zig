@@ -1,9 +1,9 @@
 const std = @import("std");
 
-const CommandType = enum { exit, echo, type, pwd, unknown };
+const CommandType = enum { exit, echo, type, pwd, cd, unknown };
 
 pub fn main() !void {
-    const stdout = std.io.getStdOut().writer();
+    const stdout: std.fs.File.Writer = std.io.getStdOut().writer();
     const stdin = std.io.getStdIn().reader();
 
     var buffer: [1024]u8 = undefined;
@@ -22,6 +22,7 @@ pub fn main() !void {
             .echo => builtinEcho(args, stdout),
             .type => builtinType(args, stdout),
             .pwd => builtinPwd(stdout),
+            .cd => builtinCd(args, stdout),
             else => handleExecutable(command, args, stdout),
         };
     }
@@ -36,6 +37,13 @@ fn builtinExit(args: []const u8) !void {
         else => 0,
     };
     std.process.exit(exit_code);
+}
+fn builtinCd(args: []const u8, out: anytype) !void {
+    if (args.len > 0) {
+        std.process.changeCurDir(args) catch {
+            try out.print("cd: {s}: No such file or directory\n", .{args});
+        };
+    }
 }
 fn builtinPwd(out: anytype) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -54,10 +62,7 @@ fn builtinEcho(args: []const u8, out: anytype) !void {
 fn builtinType(cmd: []const u8, out: anytype) !void {
     const command_type = getCommand(cmd);
     try switch (command_type) {
-        .exit => out.print("{s} is a shell builtin\n", .{cmd}),
-        .echo => out.print("{s} is a shell builtin\n", .{cmd}),
-        .type => out.print("{s} is a shell builtin\n", .{cmd}),
-        .pwd => out.print("{s} is a shell builtin\n", .{cmd}),
+        .exit, .echo, .type, .pwd, .cd => out.print("{s} is a shell builtin\n", .{cmd}),
         else => handleExecutableType(cmd, out),
     };
 }
