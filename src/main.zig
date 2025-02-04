@@ -75,7 +75,7 @@ fn handleExecutable(cmd: []const u8, out: anytype) !void {
         const is_executable = mode & 0b001 != 0;
         // The last bit (0b001) represents the execute permission.
         if (!is_executable) continue;
-        try out.print("{s} is {s}\n", .{ cmd, path });
+        try out.print("{s} is {s}\n", .{ cmd, file_path });
         return;
     }
 
