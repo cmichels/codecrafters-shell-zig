@@ -119,6 +119,7 @@ fn getExecutable(allocator: std.mem.Allocator, cmd: []const u8) ![]const u8 {
         defer allocator.free(file_path);
 
         const file = std.fs.openFileAbsolute(file_path, .{ .mode = .read_only }) catch continue;
+
         defer file.close();
 
         const mode = file.mode() catch continue;
