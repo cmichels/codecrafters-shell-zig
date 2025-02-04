@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const CommandType = enum { exit, echo, type, unknown };
+const CommandType = enum { exit, echo, type, pwd, unknown };
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
@@ -21,6 +21,7 @@ pub fn main() !void {
             .exit => builtinExit(args),
             .echo => builtinEcho(args, stdout),
             .type => builtinType(args, stdout),
+            .pwd => builtinPwd(stdout),
             else => handleExecutable(command, args, stdout),
         };
     }
@@ -36,6 +37,16 @@ fn builtinExit(args: []const u8) !void {
     };
     std.process.exit(exit_code);
 }
+fn builtinPwd(out: anytype) !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    defer _ = gpa.deinit();
+    const cwd = try std.fs.cwd().realpathAlloc(allocator, ".");
+
+    defer allocator.free(cwd);
+    try out.print("{s}\n", .{cwd});
+}
 
 fn builtinEcho(args: []const u8, out: anytype) !void {
     try out.print("{s}\n", .{args});
@@ -46,6 +57,7 @@ fn builtinType(cmd: []const u8, out: anytype) !void {
         .exit => out.print("{s} is a shell builtin\n", .{cmd}),
         .echo => out.print("{s} is a shell builtin\n", .{cmd}),
         .type => out.print("{s} is a shell builtin\n", .{cmd}),
+        .pwd => out.print("{s} is a shell builtin\n", .{cmd}),
         else => handleExecutableType(cmd, out),
     };
 }
