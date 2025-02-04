@@ -40,9 +40,22 @@ fn builtinExit(args: []const u8) !void {
 }
 fn builtinCd(args: []const u8, out: anytype) !void {
     if (args.len > 0) {
-        std.process.changeCurDir(args) catch {
-            try out.print("cd: {s}: No such file or directory\n", .{args});
-        };
+        if (std.mem.eql(u8, args, "~")) {
+            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+            const allocator = gpa.allocator();
+
+            defer _ = gpa.deinit();
+            const cwd = try std.process.getEnvVarOwned(allocator, "HOME");
+
+            defer allocator.free(cwd);
+            std.process.changeCurDir(cwd) catch {
+                try out.print("cd: {s}: No such file or directory\n", .{args});
+            };
+        } else {
+            std.process.changeCurDir(args) catch {
+                try out.print("cd: {s}: No such file or directory\n", .{args});
+            };
+        }
     }
 }
 fn builtinPwd(out: anytype) !void {
