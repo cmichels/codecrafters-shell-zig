@@ -56,9 +56,8 @@ fn handleExecutableType(cmd: []const u8, out: anytype) !void {
 
     const allocator = gpa.allocator();
 
-    const file_path = getExecutable(allocator, cmd) catch |err| {
+    const file_path = getExecutable(allocator, cmd) catch {
         try out.print("{s}: not found\n", .{cmd});
-        return err;
     };
     defer allocator.free(file_path);
 
