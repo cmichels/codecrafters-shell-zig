@@ -21,7 +21,7 @@ pub fn main() !void {
             .exit => handleExit(args),
             .echo => handleEcho(args, stdout),
             .type => handleType(args, stdout),
-            else => handleExecutable(command, args),
+            else => handleExecutable(command, args, stdout),
         };
     }
 }
@@ -58,18 +58,22 @@ fn handleExecutableType(cmd: []const u8, out: anytype) !void {
 
     const file_path = getExecutable(allocator, cmd) catch {
         try out.print("{s}: not found\n", .{cmd});
+        return;
     };
     defer allocator.free(file_path);
 
     try out.print("{s} is {s}\n", .{ cmd, file_path });
 }
-fn handleExecutable(cmd: []const u8, args: []const u8) !void {
+fn handleExecutable(cmd: []const u8, args: []const u8, out: anytype) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
 
-    const file_path = try getExecutable(allocator, cmd);
+    const file_path = getExecutable(allocator, cmd) catch {
+        try out.print("{s}: not found\n", .{cmd});
+        return;
+    };
     defer allocator.free(file_path);
 
     var argv = std.ArrayList([]const u8).init(allocator);
