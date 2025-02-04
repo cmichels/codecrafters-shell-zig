@@ -75,8 +75,6 @@ fn handleExecutable(cmd: []const u8, args: []const u8) !void {
 
     var argv = std.ArrayList([]const u8).init(allocator);
     defer argv.deinit();
-    std.debug.print("file_path {s}\n", .{file_path});
-    std.debug.print("args {s}\n", .{args});
 
     try argv.append(file_path);
     if (args.len > 0) {
