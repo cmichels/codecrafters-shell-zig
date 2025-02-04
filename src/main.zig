@@ -21,7 +21,7 @@ pub fn main() !void {
             .exit => handleExit(args),
             .echo => handleEcho(args, stdout),
             .type => handleType(args, stdout),
-            else => stdout.print("{s}: command not found\n", .{command}),
+            else => handleExecutable(command, args),
         };
     }
 }
@@ -46,16 +46,47 @@ fn handleType(cmd: []const u8, out: anytype) !void {
         .exit => out.print("{s} is a shell builtin\n", .{cmd}),
         .echo => out.print("{s} is a shell builtin\n", .{cmd}),
         .type => out.print("{s} is a shell builtin\n", .{cmd}),
-        else => handleExecutable(cmd, out),
+        else => handleExecutableType(cmd, out),
     };
 }
 
-fn handleExecutable(cmd: []const u8, out: anytype) !void {
+fn handleExecutableType(cmd: []const u8, out: anytype) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
 
+    const file_path = getExecutable(allocator, cmd) catch |err| {
+        try out.print("{s}: not found\n", .{cmd});
+        return err;
+    };
+    defer allocator.free(file_path);
+
+    try out.print("{s} is {s}\n", .{ cmd, file_path });
+}
+fn handleExecutable(cmd: []const u8, args: []const u8) !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    const allocator = gpa.allocator();
+
+    const file_path = try getExecutable(allocator, cmd);
+    defer allocator.free(file_path);
+
+    var argv = std.ArrayList([]const u8).init(allocator);
+    defer argv.deinit();
+    std.debug.print("file_path {s}\n", .{file_path});
+    std.debug.print("args {s}\n", .{args});
+
+    try argv.append(file_path);
+    if (args.len > 0) {
+        try argv.append(args);
+    }
+
+    var child = std.process.Child.init(argv.items, allocator);
+    _ = try child.spawnAndWait();
+}
+fn getExecutable(allocator: std.mem.Allocator, cmd: []const u8) ![]const u8 {
     const path_env = std.process.getEnvVarOwned(allocator, "PATH") catch |err| switch (err) {
         else => "",
     };
@@ -75,9 +106,7 @@ fn handleExecutable(cmd: []const u8, out: anytype) !void {
         const is_executable = mode & 0b001 != 0;
         // The last bit (0b001) represents the execute permission.
         if (!is_executable) continue;
-        try out.print("{s} is {s}\n", .{ cmd, file_path });
-        return;
+        return allocator.dupe(u8, file_path);
     }
-
-    try out.print("{s}: not found\n", .{cmd});
+    return error.FileNotFound;
 }
