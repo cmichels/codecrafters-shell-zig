@@ -22,7 +22,7 @@ pub fn main() !void {
         const args = commands.items[1..];
 
         try switch (command_type) {
-            .exit => builtinExit(args[0]),
+            .exit => builtinExit(args),
             .echo => builtinEcho(allocator, args, stdout),
             .type => builtinType(args[0], stdout),
             .pwd => builtinPwd(allocator, stdout),
@@ -43,11 +43,12 @@ fn parseCommands(allocator: std.mem.Allocator, user_input: []const u8) !std.Arra
     defer commandBuffer.deinit();
 
     var in_quote = false;
+    var in_double_quote = false;
     for (remaining) |token| {
 
         // encountered a space outside of a quoted section
         // signalling the end of an arg
-        if (token == ' ' and !in_quote) {
+        if (token == ' ' and !in_quote and !in_double_quote) {
             //buffer has args and should be flushed
             if (commandBuffer.items.len > 0) {
                 // convert memory ownershipt to caller(commands)
@@ -59,9 +60,14 @@ fn parseCommands(allocator: std.mem.Allocator, user_input: []const u8) !std.Arra
             continue;
         }
 
-        if (token == '\'') {
+        if (token == '\'' and !in_double_quote) {
             // check for open/close quote
             in_quote = !in_quote;
+            continue;
+        }
+        if (token == '\"') {
+            // check for open/close quote
+            in_double_quote = !in_double_quote;
             continue;
         }
 
@@ -89,10 +95,13 @@ fn escapeChars(allocator: std.mem.Allocator, args: []const u8) ![]const u8 {
     return allocator.dupe(u8, output);
 }
 
-fn builtinExit(args: []const u8) !void {
-    const exit_code = std.fmt.parseInt(u8, args, 10) catch |err| switch (err) {
-        else => 0,
-    };
+fn builtinExit(args: [][]const u8) !void {
+    var exit_code: u8 = 0;
+    if (args.len > 0) {
+        exit_code = std.fmt.parseInt(u8, args[0], 10) catch |err| switch (err) {
+            else => 0,
+        };
+    }
     std.process.exit(exit_code);
 }
 fn builtinCd(allocator: std.mem.Allocator, args: []const u8, out: anytype) !void {
