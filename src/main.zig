@@ -44,11 +44,12 @@ fn parseCommands(allocator: std.mem.Allocator, user_input: []const u8) !std.Arra
 
     var in_quote = false;
     var in_double_quote = false;
+    var escaped = false;
     for (remaining) |token| {
 
         // encountered a space outside of a quoted section
         // signalling the end of an arg
-        if (token == ' ' and !in_quote and !in_double_quote) {
+        if (token == ' ' and !in_quote and !in_double_quote and !escaped) {
             //buffer has args and should be flushed
             if (commandBuffer.items.len > 0) {
                 // convert memory ownershipt to caller(commands)
@@ -60,15 +61,22 @@ fn parseCommands(allocator: std.mem.Allocator, user_input: []const u8) !std.Arra
             continue;
         }
 
-        if (token == '\'' and !in_double_quote) {
+        if (token == '\'' and !in_double_quote and !escaped) {
             // check for open/close quote
             in_quote = !in_quote;
             continue;
         }
-        if (token == '\"') {
+        if (token == '\"' and !escaped) {
             // check for open/close quote
             in_double_quote = !in_double_quote;
             continue;
+        }
+
+        if (token == '\\' and !in_double_quote and !in_quote) {
+            escaped = true;
+            continue;
+        } else {
+            escaped = false;
         }
 
         // add token
