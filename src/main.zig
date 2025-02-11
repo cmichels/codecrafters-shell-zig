@@ -11,25 +11,82 @@ pub fn main() !void {
         try stdout.print("$ ", .{});
         const user_input = try stdin.readUntilDelimiter(&buffer, '\n');
 
-        var commands = std.mem.splitScalar(u8, user_input, ' ');
-        const command = commands.first();
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
 
-        const args = commands.rest();
+        const allocator = arena.allocator();
+        const commands = try parseCommands(allocator, user_input);
+        defer commands.deinit();
+        const command = commands.items[0];
         const command_type = getCommand(command);
+        const args = commands.items[1..];
 
         try switch (command_type) {
-            .exit => builtinExit(args),
-            .echo => builtinEcho(args, stdout),
-            .type => builtinType(args, stdout),
-            .pwd => builtinPwd(stdout),
-            .cd => builtinCd(args, stdout),
-            else => handleExecutable(command, args, stdout),
+            .exit => builtinExit(args[0]),
+            .echo => builtinEcho(allocator, args, stdout),
+            .type => builtinType(args[0], stdout),
+            .pwd => builtinPwd(allocator, stdout),
+            .cd => builtinCd(allocator, args[0], stdout),
+            else => handleExecutable(allocator, command, args, stdout),
         };
     }
 }
 
+fn parseCommands(allocator: std.mem.Allocator, user_input: []const u8) !std.ArrayList([]const u8) {
+    var tokens = std.mem.splitScalar(u8, user_input, ' ');
+
+    var commands = std.ArrayList([]const u8).init(allocator);
+    try commands.append(try allocator.dupe(u8, tokens.first()));
+
+    const remaining = tokens.rest();
+    var commandBuffer = std.ArrayList(u8).init(allocator);
+    defer commandBuffer.deinit();
+
+    var in_quote = false;
+    for (remaining) |token| {
+
+        // encountered a space outside of a quoted section
+        // signalling the end of an arg
+        if (token == ' ' and !in_quote) {
+            //buffer has args and should be flushed
+            if (commandBuffer.items.len > 0) {
+                // convert memory ownershipt to caller(commands)
+
+                try commands.append(try commandBuffer.toOwnedSlice());
+                // cleanup
+                commandBuffer.clearRetainingCapacity();
+            }
+            continue;
+        }
+
+        if (token == '\'') {
+            // check for open/close quote
+            in_quote = !in_quote;
+            continue;
+        }
+
+        // add token
+        try commandBuffer.append(token);
+    }
+    // flush any remaining args
+    if (commandBuffer.items.len > 0) {
+        // convert memory ownershipt to caller(commands)
+        try commands.append(try commandBuffer.toOwnedSlice());
+    }
+
+    return commands;
+}
+
 fn getCommand(cmd: []const u8) CommandType {
     return std.meta.stringToEnum(CommandType, cmd) orelse CommandType.unknown;
+}
+
+fn escapeChars(allocator: std.mem.Allocator, args: []const u8) ![]const u8 {
+    const output = try allocator.dupe(u8, args);
+    defer allocator.free(output);
+
+    std.mem.replaceScalar(u8, output, '\'', '"');
+    return allocator.dupe(u8, output);
 }
 
 fn builtinExit(args: []const u8) !void {
@@ -38,13 +95,9 @@ fn builtinExit(args: []const u8) !void {
     };
     std.process.exit(exit_code);
 }
-fn builtinCd(args: []const u8, out: anytype) !void {
+fn builtinCd(allocator: std.mem.Allocator, args: []const u8, out: anytype) !void {
     if (args.len > 0) {
         if (std.mem.eql(u8, args, "~")) {
-            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-            const allocator = gpa.allocator();
-
-            defer _ = gpa.deinit();
             const cwd = try std.process.getEnvVarOwned(allocator, "HOME");
 
             defer allocator.free(cwd);
@@ -58,19 +111,17 @@ fn builtinCd(args: []const u8, out: anytype) !void {
         }
     }
 }
-fn builtinPwd(out: anytype) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-
-    defer _ = gpa.deinit();
+fn builtinPwd(allocator: std.mem.Allocator, out: anytype) !void {
     const cwd = try std.fs.cwd().realpathAlloc(allocator, ".");
 
     defer allocator.free(cwd);
     try out.print("{s}\n", .{cwd});
 }
 
-fn builtinEcho(args: []const u8, out: anytype) !void {
-    try out.print("{s}\n", .{args});
+fn builtinEcho(allocator: std.mem.Allocator, args: [][]const u8, out: anytype) !void {
+    const joined = try std.mem.join(allocator, " ", args);
+    defer allocator.free(joined);
+    try out.print("{s}\n", .{joined});
 }
 fn builtinType(cmd: []const u8, out: anytype) !void {
     const command_type = getCommand(cmd);
@@ -95,12 +146,7 @@ fn handleExecutableType(cmd: []const u8, out: anytype) !void {
     try out.print("{s} is {s}\n", .{ cmd, file_path });
 }
 
-fn handleExecutable(cmd: []const u8, args: []const u8, out: anytype) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
-    const allocator = gpa.allocator();
-
+fn handleExecutable(allocator: std.mem.Allocator, cmd: []const u8, args: [][]const u8, out: anytype) !void {
     const file_path = getExecutable(allocator, cmd) catch {
         try out.print("{s}: not found\n", .{cmd});
         return;
@@ -112,7 +158,9 @@ fn handleExecutable(cmd: []const u8, args: []const u8, out: anytype) !void {
 
     try argv.append(cmd);
     if (args.len > 0) {
-        try argv.append(args);
+        for (args) |arg| {
+            try argv.append(arg);
+        }
     }
 
     var child = std.process.Child.init(argv.items, allocator);
