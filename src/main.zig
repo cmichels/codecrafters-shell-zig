@@ -34,10 +34,7 @@ pub fn main() !void {
 
 fn parseCommands(allocator: std.mem.Allocator, user_input: []const u8) !std.ArrayList([]const u8) {
     var tokens = std.mem.splitScalar(u8, user_input, ' ');
-
     var commands = std.ArrayList([]const u8).init(allocator);
-    try commands.append(try allocator.dupe(u8, tokens.first()));
-
     const remaining = tokens.rest();
     var commandBuffer = std.ArrayList(u8).init(allocator);
     defer commandBuffer.deinit();
