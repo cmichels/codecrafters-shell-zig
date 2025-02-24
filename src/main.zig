@@ -66,7 +66,7 @@ fn parseCommands(allocator: std.mem.Allocator, user_input: []const u8) !std.Arra
             in_quote = !in_quote;
             continue;
         }
-        if (token == '\"' and !escaped) {
+        if (token == '\"' and !escaped and !in_quote) {
             // check for open/close quote
             in_double_quote = !in_double_quote;
             continue;
